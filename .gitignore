@@ -6,3 +6,5 @@ firebase-admin-config.json
 *.log
 dist/
 build/
+
+RENDER_SECRETS.txt
