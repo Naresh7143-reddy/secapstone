@@ -8,3 +8,5 @@ dist/
 build/
 
 RENDER_SECRETS.txt
+
+db/migrate.js

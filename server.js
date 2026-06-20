@@ -25,12 +25,14 @@ const authRoutes = require('./routes/auth');
 const classroomRoutes = require('./routes/classrooms');
 const problemRoutes = require('./routes/problems');
 const submissionRoutes = require('./routes/submissions');
+const runRoutes = require('./routes/run');
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/classrooms', classroomRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/submissions', submissionRoutes);
+app.use('/api/run', runRoutes);
 
 // Root + health check endpoints
 app.get('/', (req, res) => {
