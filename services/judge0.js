@@ -68,4 +68,31 @@ const executeCode = async (code, language = 'python', input = '') => {
   }
 };
 
-module.exports = { executeCode, languageMap };
+/**
+ * Run code against a list of test cases.
+ * tests: [{ input, expected }]
+ * Returns [{ input, expected, output, passed, status }]
+ */
+const runAgainstTests = async (code, language = 'python', tests = []) => {
+  const results = [];
+  for (const t of tests) {
+    let r;
+    try {
+      r = await executeCode(code, language, t.input || '');
+    } catch {
+      r = { status: 'Error', output: '', stderr: 'execution failed' };
+    }
+    const output = (r.output || '').replace(/\s+$/, '');
+    const expected = (t.expected || '').replace(/\s+$/, '');
+    results.push({
+      input: t.input || '',
+      expected,
+      output,
+      passed: output === expected && r.status === 'Accepted',
+      status: r.status,
+    });
+  }
+  return results;
+};
+
+module.exports = { executeCode, runAgainstTests, languageMap };

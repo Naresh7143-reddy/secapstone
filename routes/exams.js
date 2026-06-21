@@ -29,12 +29,20 @@ router.post('/', verifyToken, async (req, res) => {
     const rows = questions.map((q, i) => ({
       exam_id: exam.id,
       title: q.title,
-      description: q.description || '',
+      description: q.description || q.problem_statement || '',
       difficulty: q.difficulty || 'easy',
       language: q.language || 'python',
       starter_code: q.starter_code || '',
       points: q.points || 10,
       position: i,
+      input_format: q.input_format || '',
+      output_format: q.output_format || '',
+      constraints: q.constraints || '',
+      sample_test_cases: q.sample_test_cases || [],
+      hidden_test_cases: q.hidden_test_cases || [],
+      supported_languages: q.supported_languages || ['python', 'java', 'cpp'],
+      reference_solution: q.reference_solution || '',
+      tags: q.tags || [],
     }));
     const { error: qErr } = await supabase.from('exam_questions').insert(rows);
     if (qErr) throw qErr;
@@ -90,31 +98,44 @@ router.post('/:id/submit', verifyToken, async (req, res) => {
     const { question_id, code, language, paste_count, blur_count, flagged, flag_reason } =
       req.body;
 
-    // Look up the question for points + language.
+    // Look up the question for points + hidden test cases.
     const { data: question, error: qErr } = await supabase
       .from('exam_questions')
-      .select('points, language')
+      .select('points, language, hidden_test_cases')
       .eq('id', question_id)
       .single();
     if (qErr) throw new Error('Question not found');
 
     let status = 'Submitted';
     let score = 0;
+    let testsPassed = 0;
+    let testsTotal = 0;
+    const points = question.points || 10;
     const isFlagged = !!flagged;
+    const lang = language || question.language || 'python';
 
     if (isFlagged) {
       // Proctoring: cheating detected -> auto zero.
       status = 'Flagged';
       score = 0;
     } else {
+      const hidden = Array.isArray(question.hidden_test_cases)
+        ? question.hidden_test_cases
+        : [];
       try {
-        const result = await judge0Service.executeCode(
-          code || '',
-          language || question.language || 'python',
-          ''
-        );
-        status = result.status;
-        score = result.status === 'Accepted' ? question.points || 10 : 0;
+        if (hidden.length > 0) {
+          // Score by hidden test cases passed.
+          const results = await judge0Service.runAgainstTests(code || '', lang, hidden);
+          testsTotal = results.length;
+          testsPassed = results.filter((r) => r.passed).length;
+          score = Math.round((testsPassed / testsTotal) * points);
+          status = `${testsPassed}/${testsTotal} passed`;
+        } else {
+          // No hidden tests -> fall back to "runs cleanly".
+          const result = await judge0Service.executeCode(code || '', lang, '');
+          status = result.status;
+          score = result.status === 'Accepted' ? points : 0;
+        }
       } catch {
         status = 'Execution error';
         score = 0;
@@ -133,6 +154,9 @@ router.post('/:id/submit', verifyToken, async (req, res) => {
             code: code || '',
             status,
             score,
+            language: lang,
+            tests_passed: testsPassed,
+            tests_total: testsTotal,
             flagged: isFlagged,
             flag_reason: isFlagged ? flag_reason || 'Suspicious activity' : null,
             paste_count: paste_count || 0,

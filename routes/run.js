@@ -20,4 +20,22 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Run code against provided (visible) test cases — for the student "Run" button.
+router.post('/tests', async (req, res) => {
+  try {
+    const { code, language, tests } = req.body;
+    if (!code) return res.status(400).json({ error: 'code is required' });
+    const results = await judge0Service.runAgainstTests(
+      code,
+      language || 'python',
+      Array.isArray(tests) ? tests : []
+    );
+    const passed = results.filter((r) => r.passed).length;
+    res.json({ results, passed, total: results.length });
+  } catch (error) {
+    console.error('Run tests error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
