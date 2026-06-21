@@ -28,6 +28,7 @@ const submissionRoutes = require('./routes/submissions');
 const runRoutes = require('./routes/run');
 const examRoutes = require('./routes/exams');
 const aiRoutes = require('./routes/ai');
+const libraryRoutes = require('./routes/library');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -37,6 +38,7 @@ app.use('/api/submissions', submissionRoutes);
 app.use('/api/run', runRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/library', libraryRoutes);
 
 // Root + health check endpoints
 app.get('/', (req, res) => {
