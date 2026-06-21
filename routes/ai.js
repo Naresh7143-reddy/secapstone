@@ -5,7 +5,7 @@ const { verifyToken } = require('../middleware/auth');
 
 const GROK_URL = process.env.GROK_API_URL || 'https://api.x.ai/v1/chat/completions';
 const GROK_KEY = process.env.GROK_API_KEY;
-const GROK_MODEL = process.env.GROK_MODEL || 'grok-2-latest';
+const GROK_MODEL = process.env.GROK_MODEL || 'grok-4.3';
 
 // AI evaluation of a code submission using the Grok API.
 router.post('/evaluate', verifyToken, async (req, res) => {
