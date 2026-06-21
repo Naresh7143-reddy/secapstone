@@ -148,6 +148,48 @@ module.exports = (io) => {
     });
 
     /* ============================================================
+     * WebRTC signaling (Zoom-style video/mic/screen-share mesh)
+     * The server only relays SDP/ICE between peers in a media room.
+     * ============================================================ */
+    const mediaRooms = (io._mediaRooms = io._mediaRooms || {}); // { [roomId]: { [socketId]: {user_id, user_name} } }
+
+    socket.on('rtc:join', ({ room_id, user_id, user_name }) => {
+      socket.join(`media_${room_id}`);
+      socket.data.media_room = room_id;
+      socket.data.media_name = user_name;
+      if (!mediaRooms[room_id]) mediaRooms[room_id] = {};
+
+      // Send the list of peers already in the call to the newcomer (they wait for offers).
+      const existing = Object.entries(mediaRooms[room_id]).map(([sid, info]) => ({
+        socket_id: sid,
+        user_name: info.user_name,
+      }));
+      socket.emit('rtc:peers', existing);
+
+      // Register, then tell existing peers a newcomer arrived (they initiate offers).
+      mediaRooms[room_id][socket.id] = { user_id, user_name };
+      socket.to(`media_${room_id}`).emit('rtc:peer-joined', {
+        socket_id: socket.id,
+        user_name,
+      });
+    });
+
+    // Relay an SDP offer/answer or ICE candidate to a specific peer.
+    socket.on('rtc:signal', ({ to, data }) => {
+      io.to(to).emit('rtc:signal', { from: socket.id, data });
+    });
+
+    socket.on('rtc:leave', () => {
+      const rid = socket.data.media_room;
+      if (rid && mediaRooms[rid]) {
+        delete mediaRooms[rid][socket.id];
+        socket.to(`media_${rid}`).emit('rtc:peer-left', { socket_id: socket.id });
+        socket.leave(`media_${rid}`);
+      }
+      socket.data.media_room = null;
+    });
+
+    /* ============================================================
      * Chat (works for both classroom_ and room_ channels)
      * ============================================================ */
     socket.on('send_message', (data) => {
@@ -188,6 +230,15 @@ module.exports = (io) => {
         );
         if (rooms[room_id].members.length !== before) {
           io.to(`room_${room_id}`).emit('room:members', rooms[room_id].members);
+        }
+      }
+
+      // Media room (WebRTC) cleanup
+      const mediaRooms = io._mediaRooms || {};
+      for (const room_id in mediaRooms) {
+        if (mediaRooms[room_id][socket.id]) {
+          delete mediaRooms[room_id][socket.id];
+          io.to(`media_${room_id}`).emit('rtc:peer-left', { socket_id: socket.id });
         }
       }
     });
